@@ -61,16 +61,107 @@ Easy21Player <- R6Class("Easy21Player",
         new_score = current_score - value 
       }
       return(new_score)
-    }
+    },
     
-    step = function(state, action){
+    step = function(action){
+      state=self$state
+      self$history  = c(self$history, paste("player: ", action))
       
+      if(action == "hit"){
+        drawCard = self$draw_card()
+        value = drawCard[[2]]
+        color = drawCard[[1]]
+        
+        self$history  = c(self$history, paste("Color: ", color, " . Value: ", value))
+        
+        self$state$player_score = self$compute_new_score(value, color, current_score = self$state$player_score)
+        new_state = self$state$clone()
+        
+        if(self$goes_bust(self$state$player_score)){
+          # player goes bust
+          reward = -1
+          state = "terminal"
+          self$history  = c(self$history, state)
+          return(list(state, reward))
+        }
+        else{
+          reward = 0
+          self$history  = c(self$history, new_state)
+          return(list(self$state, reward))
+        }
+      }
+      else{
+        new_state = self$state$clone()
+        self$history  = c(self$history, new_state)
+        #TODO
+        dealer = self$dealer_moves()
+        return(dealer)
+      }
+    },
+    
+    dealer_moves = function(){
+      
+      while(self$state$dealer_score < 17)
+      {
+        drawCard = self$draw_card()
+        value = drawCard[[2]]
+        color = drawCard[[1]]
+        new_dealer_score = self$compute_new_score(value, color, self$state$dealer_score)
+        self$state$dealer_score = new_dealer_score
+        
+        new_state = self$state$clone()
+        
+        #Add to history
+        self$history  = c(self$history, paste("dealer: ", "hit"))
+        self$history  = c(self$history, paste("Color: ", color, " . Value: ", value))
+        
+        if(self$goes_bust(new_dealer_score))
+        {
+          # dealer goes bust, player wins
+          reward = 1
+          state = "terminal"
+          self$history  = c(self$history, state)
+          return(list(state, reward))
+        }
+        else
+        {
+          self$history  = c(self$history, new_state)
+        }
+      }
+      
+      self$history  = c(self$history, "dealer: stick")
+      player_score = self$state$player_score
+      dealer_score = self$state$dealer_score
+      
+      # score > 17 -> dealer sticks
+      state = "terminal"
+      self$history  = c(self$history, state)
+      
+      if(dealer_score < player_score){ # player wins 
+        reward = 1
+        return(list(state, reward))    
+      }
+      if(dealer_score == player_score){ # draw
+        reward = 0
+        return(list(state, reward))       
+      }
+      if(dealer_score > player_score){ # player loses
+        reward = -1
+        return(list(state, reward))
+      }
+      
+    },
+    
+    hit = function(){
+      self$step("hit")
+    },
+    
+    stick = function(){
+      self$step("stick")
     }
   )
 )
 
 
 s = Easy21Player$new()
-s$compute_new_score(3, "black", 5)
-s$state
-s$history
+s$hit()
